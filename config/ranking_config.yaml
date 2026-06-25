@@ -1,0 +1,18 @@
+model:
+  name: "all-MiniLM-L6-v2"
+  cache_dir: "./model_cache"
+  device: "cpu"
+
+weights:
+  semantic_similarity: 0.45
+  rule_score: 0.55
+
+penalties:
+  honeypot_multiplier: 0.02
+  unsupported_experience_multiplier: 0.05
+
+plain_language_terms:
+  - "search backend"
+  - "vector representations"
+  - "information retrieval"
+  - "hybrid retrieval"

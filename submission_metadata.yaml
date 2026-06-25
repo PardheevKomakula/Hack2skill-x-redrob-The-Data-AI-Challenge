@@ -1,0 +1,88 @@
+# Redrob Hackathon — Submission Metadata
+# Copied from submission_metadata_template.yaml and filled in.
+
+# ============================================================================
+# Team identity
+# ============================================================================
+team_name: "ByteBrad's"
+
+primary_contact:
+  name: "Komakula Pardheev"
+  email: "pardheev2006@gmail.com"
+  phone: "+91-9963884457"
+
+team_members:
+  - name: "Gorantala Vinay Kumar"
+    email: "vinaykumargorantalavk@gmail.com"
+    role: "ML Engineer"
+  - name: "M Keerthana"
+    email: "mkeerthana217@gmail.com"
+    role: "Data Engineer"
+
+# ============================================================================
+# Code and reproducibility
+# ============================================================================
+github_repo: "https://github.com/PardheevKomakula/Hack2skill-x-redrob-The-Data-AI-Challenge.git"
+
+sandbox_link: "https://colab.research.google.com/drive/1Ed2S-2tn9KbigP9cI2Zc5ymPho5Sz7Oc?usp=sharing"
+
+reproduce_command: "python rank.py --candidates ./candidates.json --jd ./job_description.txt --out ./submission.csv"
+
+# ============================================================================
+# Compute environment
+# ============================================================================
+compute:
+  platform: "Windows 11 Laptop(Dell Inspiron 3511)"
+  cpu_cores: 8          
+  ram_gb: 16             
+  python_version: "3.10.10"  
+  os: "Windows"        
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: true   
+  pre_computation_time_minutes: 20  
+
+# ============================================================================
+# AI tools declaration
+# ============================================================================
+ai_tools_used:
+  - "Claude"
+  - "Gemini"
+
+ai_usage_summary: |
+  Used Claude (Anthropic) throughout for architecture design, code generation,
+  and iterative debugging of the ranking pipeline (honeypot detection, scoring
+  logic, template-catalog discovery). All code was reviewed, tested, and run
+  by the team against the actual candidate pool at each step; no candidate
+  data was sent to any external LLM API as part of the ranking pipeline
+  itself — rank.py uses only a locally-cached sentence-transformers model
+  with no network calls during ranking.
+
+# ============================================================================
+# Approach summary
+# ============================================================================
+methodology_summary: |
+  Modular, production-ready multi-stage ranker: (1) Rule-based honeypot filter 
+  catching internally inconsistent profiles — skill duration exceeding total 
+  experience, expert proficiency with near-zero use, chronological mismatches; 
+  (2) Semantic retrieval via sentence-transformers (all-MiniLM-L6-v2) 
+  embeddings, precomputed offline; (3) An O(1) template-based production-evidence 
+  score — full-pool analysis showed all 100K candidates' career descriptions 
+  are drawn from exactly 44 reused templates, so we hand-labeled all 44 
+  against the JD's criteria and use exact-match mapping; (4) Plain-language 
+  fallback boosts and anti-pattern penalties; (5) A multiplicative behavioral 
+  modifier from redrob_signals (recency, responsiveness). Final score blends 
+  semantic similarity (45%) and rule score (55%), multiplied by behavioral 
+  modifiers and structural integrity checks. Architecture is decoupled via 
+  YAML configs and defensively tested. Runtime is highly optimized via NumPy 
+  vectorization, processing 100K candidates in ~30-55 seconds on a local CPU.
+
+# ============================================================================
+# Declarations
+# ============================================================================
+declarations:
+  read_submission_spec: true
+  code_is_original_work: true
+  no_collusion: true
+  honeypot_check_done: true
+  reproduction_tested: true

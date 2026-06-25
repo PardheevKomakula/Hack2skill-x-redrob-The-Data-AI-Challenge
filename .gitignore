@@ -1,0 +1,28 @@
+# Python caches
+__pycache__/
+*.pyc
+*.py[cod]
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+
+# Massive raw dataset — NEVER push (487MB)
+candidates.json
+candidates.jsonl
+candidates.jsonl.gz
+
+# Heavy precomputed embedding matrices — regenerate via precompute_embeddings.py
+data/candidate_embeddings.npy
+data/candidate_ids.npy
+
+# Large analytics file — auto-generated, not needed for review
+data/summary_catalog.csv
+summary_catalog.csv
+
+# Model cache — downloaded automatically at runtime
+model_cache/
+
+# Final submission output — submitted via portal, not GitHub
+submission.csv
