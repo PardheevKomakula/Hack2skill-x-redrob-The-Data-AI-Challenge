@@ -59,11 +59,11 @@ rank.py  (main pipeline)
         │
         └─ 6. Per-candidate scoring loop:
                 │
-                ├─ A. Honeypot Detection  (src/honeypot.py — 7 checks)
+                ├─ A. Honeypot + Compliance  (src/compliance.py → src/honeypot.py)
+                │      Full 7-check delegation: date math, skill duration vs YOE,
+                │      expert+no-evidence, seniority mismatch, education sanity,
+                │      YOE inflation, duplicate descriptions
                 │      0 flags → 1.0x  |  1 flag → 0.35x  |  2+ flags → 0.02x
-                │
-                ├─ B. Structural Compliance  (src/compliance.py)
-                │      YOE vs empty history, duplicate descriptions
                 │
                 ├─ C. Full Rule Score  (src/scoring.py)
                 │      0.30 × title_relevance
@@ -94,6 +94,7 @@ rank.py  (main pipeline)
 INDIA_RUNS-2026/
 ├── rank.py                      # Main entrypoint — run this
 ├── precompute_embeddings.py     # Offline embedding generator (run once)
+├── check_honeypot_rate.py       # Validates 0% honeypot rate in submission
 ├── extract_template_catalog.py  # Discovery tool — found the 44 templates
 ├── review_candidates.py         # Manual QA / audit tool
 ├── requirements.txt
@@ -168,7 +169,7 @@ final_score = clip((base_score + plain_boost) × behavioral_mult × integrity_mu
 pip install -r requirements.txt
 ```
 
-### Step 2 — Precompute embeddings (one-time, ~20 minutes)
+### Step 2 — Precompute embeddings (one-time, ~7 min CPU / ~2 min GPU)
 ```bash
 python precompute_embeddings.py --candidates ./candidates.json
 ```
@@ -203,11 +204,11 @@ pytest tests/
 
 | Rank | candidate_id | Score | Reasoning |
 |------|-------------|-------|-----------|
-| 1 | CAND_0006567 | 0.856 | 7.9 yrs, Senior AI Engineer (Noida). Notice: 60 days. 79% response, 93% interview completion. |
-| 2 | CAND_0055905 | 0.829 | 8.1 yrs, Senior MLE (London). Notice: 30 days. 87% response, 67% interview completion. |
-| 3 | CAND_0046064 | 0.817 | 8.9 yrs, Senior NLP Engineer. Notice: 30 days. 78% response, 80% interview completion. |
-| 4 | CAND_0011687 | 0.816 | 7.8 yrs, Senior NLP Engineer (Indore). Notice: 15 days. 89% response, 77% interview completion. |
-| 5 | CAND_0046525 | 0.810 | 6.1 yrs, Senior MLE (Pune). Notice: 60 days. 88% response, 81% interview completion. |
+| 1 | CAND_0006567 | 0.869 | 7.9 yrs, Senior AI Engineer (Noida). Notice: 60 days. 79% response, 93% interview completion. |
+| 2 | CAND_0055905 | 0.841 | 8.1 yrs, Senior MLE (London). Notice: 30 days. 87% response, 67% interview completion. |
+| 3 | CAND_0046064 | 0.827 | 8.9 yrs, Senior NLP Engineer. Notice: 30 days. 78% response, 80% interview completion. |
+| 4 | CAND_0011687 | 0.824 | 7.8 yrs, Senior NLP Engineer (Indore). Notice: 15 days. 89% response, 77% interview completion. |
+| 5 | CAND_0046525 | 0.820 | 6.1 yrs, Senior MLE (Pune). Notice: 60 days. 88% response, 81% interview completion. |
 
 See [`sample_output/sample_submission.csv`](sample_output/sample_submission.csv) for the full top-10 preview.
 
@@ -221,7 +222,7 @@ See [`sample_output/sample_submission.csv`](sample_output/sample_submission.csv)
 | Similarity computation | NumPy vectorized cosine (`np.dot` on L2-normalized matrix) |
 | Candidate data | JSON / JSONL, auto-detected |
 | Pre-computation | Offline `.npy` files (float32, ~150MB, not committed) |
-| GPU | Not required — CPU only |
+| GPU | Optional — auto-detected (T4 GPU cuts precompute to ~2 min) |
 | External API calls | **None** during ranking |
 
 ---
