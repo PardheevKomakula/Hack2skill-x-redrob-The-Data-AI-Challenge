@@ -39,8 +39,8 @@ compute:
   os: "Windows"        
   uses_gpu_for_inference: false
   has_network_during_ranking: false
-  pre_computation_required: true   
-  pre_computation_time_minutes: 20  
+  pre_computation_required: true
+  pre_computation_time_minutes: 7   # ~2 min on T4 GPU, ~7 min on CPU
 
 # ============================================================================
 # AI tools declaration
@@ -50,32 +50,37 @@ ai_tools_used:
   - "Gemini"
 
 ai_usage_summary: |
-  Used Claude (Anthropic) throughout for architecture design, code generation,
-  and iterative debugging of the ranking pipeline (honeypot detection, scoring
-  logic, template-catalog discovery). All code was reviewed, tested, and run
-  by the team against the actual candidate pool at each step; no candidate
-  data was sent to any external LLM API as part of the ranking pipeline
-  itself — rank.py uses only a locally-cached sentence-transformers model
-  with no network calls during ranking.
+  Used Claude (Anthropic) and Gemini (Google DeepMind) throughout for
+  architecture design, code generation, and iterative debugging of the ranking
+  pipeline (honeypot detection, scoring logic, template-catalog discovery).
+  All code was reviewed, tested, and run by the team against the actual candidate
+  pool at each step; no candidate data was sent to any external LLM API as part
+  of the ranking pipeline itself — rank.py uses only a locally-cached
+  sentence-transformers model with no network calls during ranking.
 
 # ============================================================================
 # Approach summary
 # ============================================================================
 methodology_summary: |
-  Modular, production-ready multi-stage ranker: (1) Rule-based honeypot filter 
-  catching internally inconsistent profiles — skill duration exceeding total 
-  experience, expert proficiency with near-zero use, chronological mismatches; 
-  (2) Semantic retrieval via sentence-transformers (all-MiniLM-L6-v2) 
-  embeddings, precomputed offline; (3) An O(1) template-based production-evidence 
-  score — full-pool analysis showed all 100K candidates' career descriptions 
-  are drawn from exactly 44 reused templates, so we hand-labeled all 44 
-  against the JD's criteria and use exact-match mapping; (4) Plain-language 
-  fallback boosts and anti-pattern penalties; (5) A multiplicative behavioral 
-  modifier from redrob_signals (recency, responsiveness). Final score blends 
-  semantic similarity (45%) and rule score (55%), multiplied by behavioral 
-  modifiers and structural integrity checks. Architecture is decoupled via 
-  YAML configs and defensively tested. Runtime is highly optimized via NumPy 
-  vectorization, processing 100K candidates in ~30-55 seconds on a local CPU.
+  Modular, production-grade multi-stage ranker built on a key discovery:
+  all 100K candidates' career_history descriptions come from exactly 44 reused
+  templates. We hand-labeled all 44 against the JD and use O(1) exact-match
+  lookup as the production-evidence score component.
+
+  Pipeline stages: (1) 7-check honeypot detection — career-history date math,
+  skill-duration vs total YOE, expert-proficiency with near-zero use, seniority
+  title vs experience mismatch, education sanity, YOE inflation, duplicate
+  descriptions — with graduated penalties (1 flag: 0.35x, 2+ flags: 0.02x);
+  (2) Semantic similarity via sentence-transformers (all-MiniLM-L6-v2), embeddings
+  precomputed offline; (3) Full 5-dimension rule score: 0.30*title_relevance +
+  0.30*production_evidence + 0.15*experience_fit + 0.15*location_fit +
+  0.10*notice_fit, multiplied by anti-pattern penalty (consulting-only 0.35x,
+  CV/speech-only 0.40x, title-chaser 0.50x, shallow-LLM-wrapper 0.40x);
+  (4) Plain-language IR vocabulary boost (max +0.10); (5) Behavioral multiplier
+  from redrob_signals: recruiter_response_rate, interview_completion_rate,
+  recency, open_to_work, verification signals (floor 0.35, ceiling 1.15).
+  Final: (0.45*semantic + 0.55*rule + boost) * behavioral * integrity.
+  NumPy vectorized cosine similarity. Runtime: ~55s on CPU, ~40s on T4 GPU.
 
 # ============================================================================
 # Declarations
