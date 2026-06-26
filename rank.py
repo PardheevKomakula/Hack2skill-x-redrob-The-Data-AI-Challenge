@@ -13,7 +13,7 @@ from src.embedding_engine import ProductionEmbeddingEngine
 from src.compliance import evaluate_profile_integrity
 from src.pipeline import RankingPipeline
 from src.template_scores import TEMPLATE_SCORES
-# Full scoring engine — all signals from scoring.py now active
+# Full scoring engine
 from src.scoring import (
     rule_score,
     behavioral_multiplier,
@@ -21,7 +21,6 @@ from src.scoring import (
     production_evidence_score,
     anti_pattern_penalty,
 )
-from src.honeypot import detect_honeypot_flags
 from src import config as scoring_cfg
 
 # Configure production logging
@@ -121,36 +120,21 @@ def main():
         redrob_signals = candidate_data.get("redrob_signals", {})
         primary_description = history[0].get("description", "") if history else ""
 
-        # A. 7-Check Honeypot Detection — graduated penalty
-        #    0 flags → 1.0x  |  1 flag → 0.35x soft warn  |  2+ flags → 0.02x crushed
-        hp_flags = detect_honeypot_flags(candidate_data)
-        n_flags  = len(hp_flags)
-        if n_flags >= 2:
-            honeypot_mult = config['penalties']['honeypot_multiplier']  # 0.02
-        elif n_flags == 1:
-            honeypot_mult = 0.35
-        else:
-            honeypot_mult = 1.0
+        # A. Full 7-check honeypot + structural compliance
+        #    compliance.py now delegates to honeypot.detect_honeypot_flags():
+        #    0 flags → 1.0x | 1 flag → 0.35x | 2+ flags → 0.02x
+        is_valid, effective_integrity = evaluate_profile_integrity(candidate_data, config)
 
-        # B. Quick structural compliance (duplicate desc / YOE vs empty history)
-        _, integrity_mult = evaluate_profile_integrity(candidate_data, config)
-        effective_integrity = min(honeypot_mult, integrity_mult)
-
-        # C. Full rule score (all 5 dimensions + anti-pattern penalty)
-        #    = 0.30*title + 0.30*prod_evidence + 0.15*exp + 0.15*loc + 0.10*notice
-        #      then multiplied by anti_pattern_penalty (consulting/CV/title-chaser)
+        # B. Full rule score (all 5 dimensions + anti-pattern penalty)
         rule_s = rule_score(candidate_data)
 
-        # D. Plain-language IR vocabulary boost (max +0.10)
+        # C. Plain-language IR vocabulary boost (max +0.10)
         plain_boost = engine.evaluate_plain_language_boost(primary_description)
 
-        # E. Full behavioral multiplier — includes recency, open-to-work,
-        #    recruiter_response_rate, interview_completion_rate, verification signals
-        #    Floor 0.35 / Ceiling 1.15 (defined in src/config.py)
+        # D. Full behavioral multiplier
         beh_mult = behavioral_multiplier(candidate_data, today)
 
-        # F. Final score assembly
-        #    base = (45% semantic) + (55% rule)  →  apply boosts & multipliers
+        # E. Final score
         w_sem  = config['weights']['semantic_similarity']
         w_rule = config['weights']['rule_score']
         base_score  = (w_sem * semantic_sim) + (w_rule * rule_s)
@@ -163,7 +147,7 @@ def main():
         notice   = redrob_signals.get("notice_period_days", "N/A")
         rr       = redrob_signals.get("recruiter_response_rate", 0.5)
         icr      = redrob_signals.get("interview_completion_rate", 0.5)
-        hp_note  = f" ⚠ {n_flags} integrity flag(s)." if n_flags > 0 else ""
+        hp_note  = "" if is_valid else " ⚠ Integrity flag(s) detected."
 
         reasoning = (
             f"{yoe} yrs experience, currently {title} ({location}). "

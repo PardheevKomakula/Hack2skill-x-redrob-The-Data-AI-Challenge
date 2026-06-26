@@ -1,27 +1,36 @@
 import logging
+from . import honeypot
 
 logger = logging.getLogger(__name__)
 
+
 def evaluate_profile_integrity(candidate: dict, config: dict) -> tuple[bool, float]:
     """
-    Checks for the 7 internal consistency traps (e.g., chronological anomalies, duplication).
-    Returns a tuple of (is_valid_flag, score_multiplier).
+    Delegates to honeypot.py's detect_honeypot_flags(), which implements all
+    7 internal-consistency checks (career-history date math, skill-duration
+    vs total experience, expert-proficiency-with-near-zero-use, seniority/
+    experience mismatch, education sanity, YOE-vs-career-history-span
+    inflation, and duplicate descriptions within one candidate's own
+    history) — rather than re-implementing a smaller subset here, which is
+    how the YOE-vs-history check silently went dead in an earlier version
+    of this file (it read candidate["years_of_experience"] instead of
+    candidate["profile"]["years_of_experience"]).
+
+    Returns (is_valid_flag, score_multiplier).
     """
-    multiplier = 1.0
-    is_valid = True
-    
-    yoe = candidate.get("years_of_experience", 0)
-    history = candidate.get("career_history", [])
-    
-    # Example Trap: Calculated duration versus claimed YOE
-    if yoe > 0 and not history:
-        is_valid = False
-        multiplier *= config['penalties']['honeypot_multiplier']
-        
-    # Example Trap: Empty/Duplicate descriptions check
-    descriptions = [job.get("description", "") for job in history if job.get("description")]
-    if len(descriptions) != len(set(descriptions)) and len(descriptions) > 1:
-        is_valid = False
-        multiplier *= config['penalties']['honeypot_multiplier']
-        
+    flags = honeypot.detect_honeypot_flags(candidate)
+    is_valid = len(flags) == 0
+
+    if flags:
+        n = len(flags)
+        if n >= 2:
+            multiplier = config['penalties']['honeypot_multiplier']  # 0.02 — crushed
+        else:
+            multiplier = 0.35  # soft penalty for single flag
+        logger.debug(
+            f"Honeypot flags for {candidate.get('candidate_id')}: {flags}"
+        )
+    else:
+        multiplier = 1.0
+
     return is_valid, multiplier
